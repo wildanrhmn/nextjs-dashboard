@@ -4,17 +4,15 @@ import {
   CustomersTableType,
   InvoiceForm,
   InvoicesTable,
-  LatestInvoiceRaw,
-  LatestInvoice,
   User,
   Revenue,
 } from './definitions';
+
 import { formatCurrency } from './utils';
 import { db } from './prisma/db.server';
+import { unstable_noStore as noStore } from 'next/cache';
 export async function fetchRevenue(): Promise<Revenue[]> {
-  // Add noStore() here to prevent the response from being cached.
-  // This is equivalent to in fetch(..., {cache: 'no-store'}).
-
+  noStore();
   try {
     const data = await db.revenue.findMany();
     return data;
@@ -25,6 +23,7 @@ export async function fetchRevenue(): Promise<Revenue[]> {
 }
 
 export async function fetchLatestInvoices() {
+  noStore();
   try {
     const data = await db.invoices.findMany({
       select: {
@@ -58,6 +57,7 @@ export async function fetchLatestInvoices() {
 }
 
 export async function fetchCardData() {
+  noStore();
   try {
     const [numberOfInvoices, numberOfCustomers, invoicesByStatus] = await Promise.all([
       db.invoices.count(),
@@ -90,31 +90,49 @@ export async function fetchFilteredInvoices(
   query: string,
   currentPage: number,
 ) {
+  noStore();
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
   try {
-    const invoices = await sql<InvoicesTable>`
-      SELECT
-        invoices.id,
-        invoices.amount,
-        invoices.date,
-        invoices.status,
-        customers.name,
-        customers.email,
-        customers.image_url
-      FROM invoices
-      JOIN customers ON invoices.customer_id = customers.id
-      WHERE
-        customers.name ILIKE ${`%${query}%`} OR
-        customers.email ILIKE ${`%${query}%`} OR
-        invoices.amount::text ILIKE ${`%${query}%`} OR
-        invoices.date::text ILIKE ${`%${query}%`} OR
-        invoices.status ILIKE ${`%${query}%`}
-      ORDER BY invoices.date DESC
-      LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
-    `;
+    const invoices = await db.invoices.findMany({
+      select: {
+        id: true,
+        amount: true,
+        date: true,
+        status: true,
+        customer: {
+          select: {
+            name: true,
+            email: true,
+            image_url: true,
+          },
+        },
+      },
+      where: {
+        OR: [
+          { customer: { name: { contains: query, mode: 'insensitive' } } },
+          { customer: { email: { contains: query, mode: 'insensitive' } } },
+          { status: { contains: query, mode: 'insensitive' } },
+          { amount: { equals: Number(query) } },
+        ],
+      },
+      orderBy: {
+        date: 'desc',
+      },
+      take: ITEMS_PER_PAGE,
+      skip: offset,
+    });
 
-    return invoices.rows;
+    const processedInvoices = invoices.map((invoice: any) => ({
+      id: invoice.id,
+      amount: invoice.amount,
+      date: invoice.date,
+      status: invoice.status,
+      name: invoice.customer.name,
+      email: invoice.customer.email,
+      image_url: invoice.customer.image_url,
+    }));
+    return processedInvoices;
   } catch (error) {
     console.error('Database Error:', error);
     throw new Error('Failed to fetch invoices.');
@@ -122,6 +140,7 @@ export async function fetchFilteredInvoices(
 }
 
 export async function fetchInvoicesPages(query: string) {
+  noStore();
   try {
     const count = await sql`SELECT COUNT(*)
     FROM invoices
@@ -143,6 +162,7 @@ export async function fetchInvoicesPages(query: string) {
 }
 
 export async function fetchInvoiceById(id: string) {
+  noStore();
   try {
     const data = await sql<InvoiceForm>`
       SELECT
