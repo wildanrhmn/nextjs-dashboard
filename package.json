@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "build": "npx prisma db push && npx prisma generate && next build",
+    "build": "npx prisma generate --schema=./app/lib/prisma/schema.prisma && next build",
     "dev": "next dev",
     "prettier": "prettier --write --ignore-unknown .",
     "prettier:check": "prettier --check --ignore-unknown .",
