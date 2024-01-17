@@ -92,7 +92,7 @@ export async function fetchFilteredInvoices(
 ) {
   noStore();
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
-
+  const isQueryANumber = !isNaN(Number(query));
   try {
     const invoices = await db.invoices.findMany({
       select: {
@@ -113,7 +113,7 @@ export async function fetchFilteredInvoices(
           { customer: { name: { contains: query, mode: 'insensitive' } } },
           { customer: { email: { contains: query, mode: 'insensitive' } } },
           { status: { contains: query, mode: 'insensitive' } },
-          { amount: { equals: Number(query) } },
+          isQueryANumber ? { amount: { equals: Number(query) } } : {},
         ],
       },
       orderBy: {
