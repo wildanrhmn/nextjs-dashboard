@@ -25,14 +25,20 @@ export async function createInvoice(formData: FormData) {
       const amountInCents = amount * 100;
       const date = new Date().toISOString();
 
-      await db.invoices.create({
-        data: {
-          customer_id: customerId,
-          amount: amountInCents,
-          status: status,
-          date: date,
-        },
-      })
+      try{
+        await db.invoices.create({
+          data: {
+            customer_id: customerId,
+            amount: amountInCents,
+            status: status,
+            date: date,
+          },
+        })
+      } catch(error){
+        return{
+          message: 'Database Error: ' + error
+        }
+      }
 
       revalidatePath('/dashboard/invoices');
       redirect('/dashboard/invoices');
@@ -49,26 +55,38 @@ export async function updateInvoice(id: string, formData: FormData){
 
       const amountInCents = amount * 100;
 
-      await db.invoices.update({
-        where: {
-          id: id
-        },
-        data: {
-          customer_id: customerId,
-          amount: amountInCents,
-          status: status
+      try{
+        await db.invoices.update({
+          where: {
+            id: id
+          },
+          data: {
+            customer_id: customerId,
+            amount: amountInCents,
+            status: status
+          }
+        })
+      } catch(error){
+        return{
+          message: 'Database Error: ' + error
         }
-      })
+      }
 
       revalidatePath('/dashboard/invoices');
       redirect('/dashboard/invoices');
 }
 
 export async function deleteInvoice(id: string){
+  try{
     await db.invoices.delete({
       where: {
         id: id
       }
     })
+  } catch(error){
+    return{
+      message: 'Database Error: ' + error
+    }
+  }
     revalidatePath('/dashboard/invoices');
 }
